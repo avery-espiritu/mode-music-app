@@ -599,26 +599,6 @@ function GenerationScreen({
           </div>
         ) : (
           <>
-            {/* Mode preview */}
-            <div className="grid grid-cols-3 gap-3 pt-4">
-              {["Ionian", "Dorian", "Aeolian"].map((mode, i) => (
-                <div
-                  key={mode}
-                  className={cn(
-                    "p-3 rounded-lg border transition-all",
-                    progress > (i + 1) * 30
-                      ? "bg-primary/10 border-primary/30 text-primary"
-                      : "bg-white/5 border-white/10 text-muted-foreground",
-                  )}
-                >
-                  <p className="text-sm font-medium">{mode}</p>
-                  <p className="text-xs opacity-70">
-                    {mode === "Ionian" ? "Bright" : mode === "Dorian" ? "Soulful" : "Introspective"}
-                  </p>
-                </div>
-              ))}
-            </div>
-
             {progress >= 100 && (
               <button
                 onClick={() => onNavigate(5)}
