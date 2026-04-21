@@ -48,105 +48,41 @@ export function FigmaCanvas({
   onResetJourney,
 }: FigmaCanvasProps) {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Figma-style Top Bar */}
-      <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Music className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">Modalation</span>
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-2xl">
+        {/* Liquid glass container */}
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_8px_48px_rgba(0,0,0,0.5)] ring-1 ring-white/5 overflow-hidden">
+          <ScreenContent
+            screen={currentScreen}
+            onNavigate={onNavigate}
+            story={story}
+            onStoryChange={onStoryChange}
+            emotionalAnswers={emotionalAnswers}
+            onEmotionalAnswersChange={onEmotionalAnswersChange}
+            selectedNotes={selectedNotes}
+            onSelectedNotesChange={onSelectedNotesChange}
+            composition={composition}
+            compositionError={compositionError}
+            onGenerateComposition={onGenerateComposition}
+            onResetJourney={onResetJourney}
+          />
         </div>
-      </header>
 
-      <div className="flex-1 flex">
-        {/* Left Sidebar - Screens */}
-        {/* <aside className="w-64 border-r border-border bg-card/50 p-4 hidden lg:block">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
-            Screens
-          </h3>
-          <div className="space-y-2">
-            {screens.map((screen) => (
-              <button
-                key={screen.id}
-                onClick={() => onNavigate(screen.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                  currentScreen === screen.id
-                    ? "bg-primary/10 text-primary border border-primary/20"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
-              >
-                <screen.icon className="w-4 h-4" />
-                <span>{screen.name}</span>
-              </button>
-            ))}
-          </div>
-        </aside> */}
-
-        {/* Main Canvas Area */}
-        <main className="flex-1 bg-background p-4 md:p-8 overflow-auto">
-          <div className="max-w-4xl mx-auto">
-            {/* Screen Preview */}
-            <div className="bg-card rounded-xl border border-border shadow-2xl overflow-hidden">
-              <ScreenContent
-                screen={currentScreen}
-                onNavigate={onNavigate}
-                story={story}
-                onStoryChange={onStoryChange}
-                emotionalAnswers={emotionalAnswers}
-                onEmotionalAnswersChange={onEmotionalAnswersChange}
-                selectedNotes={selectedNotes}
-                onSelectedNotesChange={onSelectedNotesChange}
-                composition={composition}
-                compositionError={compositionError}
-                onGenerateComposition={onGenerateComposition}
-                onResetJourney={onResetJourney}
-              />
-            </div>
-
-            {/* Navigation Controls */}
-            <div className="flex items-center justify-center gap-4 mt-6">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onNavigate(Math.max(0, currentScreen - 1))}
-                disabled={currentScreen === 0}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <div className="flex items-center gap-2">
-                {screens.map((screen) => (
-                  <button
-                    key={screen.id}
-                    onClick={() => onNavigate(screen.id)}
-                    className={cn(
-                      "w-2 h-2 rounded-full transition-all",
-                      currentScreen === screen.id
-                        ? "bg-primary w-6"
-                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                    )}
-                  />
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onNavigate(Math.min(screens.length - 1, currentScreen + 1))}
-                disabled={currentScreen === screens.length - 1}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* Screen Info */}
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              Screen {currentScreen + 1} of {screens.length}: {screens[currentScreen].name}
-            </p>
-          </div>
-        </main>
+        {/* Navigation dots */}
+        <div className="flex items-center justify-center gap-3 mt-6">
+          {screens.map((screen) => (
+            <button
+              key={screen.id}
+              onClick={() => onNavigate(screen.id)}
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                currentScreen === screen.id
+                  ? "bg-white/80 w-6"
+                  : "bg-white/20 w-1.5 hover:bg-white/40"
+              )}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -225,7 +161,7 @@ function ScreenContent({
 // Screen 1: Welcome
 function WelcomeScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
   return (
-    <div className="min-h-[600px] flex flex-col items-center justify-center p-8 bg-gradient-to-b from-card to-background relative overflow-hidden">
+    <div className="min-h-[600px] flex flex-col items-center justify-center p-8 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-32 h-32 rounded-full bg-primary blur-3xl" />
@@ -291,7 +227,7 @@ function StoryInputScreen({
   onNavigate: (s: number) => void
 }) {
   return (
-    <div className="min-h-[600px] flex flex-col p-8 bg-card">
+    <div className="min-h-[600px] flex flex-col p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => onNavigate(0)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -314,7 +250,7 @@ function StoryInputScreen({
             value={story}
             onChange={(e) => onStoryChange(e.target.value)}
             placeholder="Once upon a time, in a quiet village nestled between mountains..."
-            className="flex-1 min-h-[200px] w-full p-4 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="flex-1 min-h-[200px] w-full p-4 rounded-xl bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
 
           <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
@@ -339,7 +275,7 @@ function StoryInputScreen({
                         : "The old mansion held secrets. As Sarah explored the dusty rooms, she found a letter that would unravel everything she thought she knew.",
                   )
                 }
-                className="px-3 py-1.5 rounded-lg bg-secondary/50 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
               >
                 {example.replace("&apos;", "'")}
               </button>
@@ -384,7 +320,7 @@ function AIQuestionsScreen({
   }
 
   return (
-    <div className="min-h-[600px] flex flex-col p-8 bg-card">
+    <div className="min-h-[600px] flex flex-col p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => onNavigate(1)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -402,7 +338,7 @@ function AIQuestionsScreen({
           </div>
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Modalation AI</p>
-            <div className="bg-secondary rounded-xl rounded-tl-none p-4">
+            <div className="bg-white/10 rounded-xl rounded-tl-none p-4">
               <p className="text-foreground">
                 {!isComplete
                   ? questions[currentIndex].question
@@ -434,7 +370,7 @@ function AIQuestionsScreen({
               <button
                 key={option}
                 onClick={() => handleAnswer(option)}
-                className="w-full p-4 rounded-xl border border-border bg-secondary/50 text-foreground text-left hover:border-primary/50 hover:bg-secondary transition-all"
+                className="w-full p-4 rounded-xl border border-white/10 bg-white/5 text-foreground text-left hover:border-primary/50 hover:bg-white/10 transition-all"
               >
                 {option}
               </button>
@@ -486,17 +422,15 @@ function KeyboardScreen({
   onNavigate: (s: number) => void
 }) {
   const handleNotePlay = (note: string) => {
-    // Strip octave number to get bare note name for the story selection
-    const bare = note.replace(/\d/, "")
-    if (selectedNotes.includes(bare)) {
-      onSelectedNotesChange(selectedNotes.filter((n) => n !== bare))
+    if (selectedNotes.includes(note)) {
+      onSelectedNotesChange(selectedNotes.filter((n) => n !== note))
     } else if (selectedNotes.length < 3) {
-      onSelectedNotesChange([...selectedNotes, bare])
+      onSelectedNotesChange([...selectedNotes, note])
     }
   }
 
   return (
-    <div className="min-h-[600px] flex flex-col p-8 bg-card overflow-x-auto">
+    <div className="min-h-[600px] flex flex-col p-8 overflow-x-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => onNavigate(2)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -523,7 +457,7 @@ function KeyboardScreen({
                 "w-16 h-16 rounded-xl border-2 border-dashed flex items-center justify-center text-xl font-semibold transition-all",
                 selectedNotes[i]
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground"
+                  : "border-white/10 text-muted-foreground"
               )}
             >
               {selectedNotes[i] || "?"}
@@ -535,7 +469,7 @@ function KeyboardScreen({
         </div>
 
         {/* Real 2-octave piano + sequence player */}
-        <PianoKeyboard onNotePlay={handleNotePlay} className="mb-6" />
+        <PianoKeyboard onNotePlay={handleNotePlay} selectedNotes={selectedNotes} className="mb-6" />
 
         <button
           onClick={() => onNavigate(4)}
@@ -608,7 +542,7 @@ function GenerationScreen({
   const stageLabel = GENERATION_STAGES[stageIdx === -1 ? GENERATION_STAGES.length - 1 : stageIdx].name
 
   return (
-    <div className="min-h-[600px] flex flex-col items-center justify-center p-8 bg-card">
+    <div className="min-h-[600px] flex flex-col items-center justify-center p-8">
       <div className="max-w-md w-full text-center space-y-8">
         {/* Animated icon */}
         <div className="relative w-24 h-24 mx-auto">
@@ -674,7 +608,7 @@ function GenerationScreen({
                     "p-3 rounded-lg border transition-all",
                     progress > (i + 1) * 30
                       ? "bg-primary/10 border-primary/30 text-primary"
-                      : "bg-secondary/50 border-border text-muted-foreground",
+                      : "bg-white/5 border-white/10 text-muted-foreground",
                   )}
                 >
                   <p className="text-sm font-medium">{mode}</p>
@@ -794,7 +728,7 @@ function PlaybackScreen({
   }, [])
 
   return (
-    <div className="min-h-[600px] flex flex-col p-8 bg-card">
+    <div className="min-h-[600px] flex flex-col p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => onNavigate(0)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -806,7 +740,7 @@ function PlaybackScreen({
 
       <div className="flex-1 flex flex-col max-w-xl mx-auto w-full">
         {/* Active note display */}
-        <div className="h-24 rounded-xl bg-secondary/50 border border-border mb-6 flex items-center justify-center overflow-hidden relative">
+        <div className="h-24 rounded-xl bg-white/5 border border-white/10 mb-6 flex items-center justify-center overflow-hidden relative">
           {isPlaying ? (
             <div className="flex flex-col items-center gap-1">
               <span className="text-4xl font-bold text-primary transition-all duration-75">
@@ -861,7 +795,7 @@ function PlaybackScreen({
             return NOTE_ORDER.indexOf(a.slice(0, -1)) - NOTE_ORDER.indexOf(b.slice(0, -1))
           })
           return (
-            <div className="p-3 rounded-xl bg-secondary/50 border border-border mb-4 overflow-x-auto">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 mb-4 overflow-x-auto">
               <p className="text-xs text-muted-foreground mb-2">Scale notes used</p>
               <div className="flex gap-1.5 flex-wrap">
                 {scaleNotes.map((note) => (
@@ -893,7 +827,7 @@ function PlaybackScreen({
         )}
 
         {/* Story text */}
-        <div className="p-4 rounded-xl bg-secondary/50 border border-border mb-6">
+        <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-6">
           <p className="text-foreground leading-relaxed text-sm">
             {story.trim().length > 0
               ? <>&ldquo;{story.trim()}&rdquo;</>
@@ -963,7 +897,7 @@ function PlaybackScreen({
 
         <button
           onClick={onResetJourney}
-          className="mt-6 w-full py-3 rounded-xl border border-border text-foreground font-medium hover:bg-secondary transition-colors"
+          className="mt-6 w-full py-3 rounded-xl border border-white/10 text-foreground font-medium hover:bg-white/10 transition-colors"
         >
           Create Another Story
         </button>

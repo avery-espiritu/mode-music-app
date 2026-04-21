@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Play, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -33,23 +33,44 @@ const BLACK_KEY_H = 100
 
 interface PianoKeyboardProps {
   onNotePlay?: (note: string) => void
+  selectedNotes?: string[]
   className?: string
 }
 
-export function PianoKeyboard({ onNotePlay, className }: PianoKeyboardProps) {
+export function PianoKeyboard({ onNotePlay, selectedNotes = [], className }: PianoKeyboardProps) {
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set())
   const [isPlaying, setIsPlaying] = useState(false)
-  const [sequence, setSequence] = useState<NoteEvent[]>([
-    { note: "C4", duration: 0.4 },
-    { note: "E4", duration: 0.4 },
-    { note: "G4", duration: 0.4 },
-    { note: "C5", duration: 0.8 },
-  ])
-  const [sequenceInput, setSequenceInput] = useState(
-    "C4:0.4, E4:0.4, G4:0.4, C5:0.8"
-  )
-  const [parseError, setParseError] = useState<string | null>(null)
   const stopHandleRef = useRef<{ stop: () => void } | null>(null)
+
+  // Derived baseline from selected notes — updates whenever selection changes
+  const notesKey = selectedNotes.join(",")
+  const derivedInput = selectedNotes.map(n => `${n}:0.4`).join(", ")
+
+  // Manual override: user typed something different; cleared when selection changes
+  const [manualInput, setManualInput] = useState<string | null>(null)
+  const prevNotesKey = useRef(notesKey)
+  useEffect(() => {
+    if (prevNotesKey.current !== notesKey) {
+      prevNotesKey.current = notesKey
+      setManualInput(null)
+    }
+  }, [notesKey])
+
+  const displayInput = manualInput ?? derivedInput
+
+  // Derive sequence and error purely — no setState during render
+  const { sequence, parseError } = useMemo(() => {
+    const parts = displayInput.split(",").map(s => s.trim()).filter(Boolean)
+    const events: NoteEvent[] = []
+    for (const part of parts) {
+      const [noteStr, durStr] = part.split(":").map(s => s.trim())
+      if (!noteStr) return { sequence: [], parseError: `Invalid entry: "${part}"` }
+      const duration = durStr ? parseFloat(durStr) : 0.4
+      if (isNaN(duration) || duration <= 0) return { sequence: [], parseError: `Bad duration in: "${part}"` }
+      events.push({ note: noteStr, duration })
+    }
+    return { sequence: events, parseError: null }
+  }, [displayInput])
 
   const flashNote = useCallback((note: string, durationMs: number) => {
     setActiveNotes((prev) => new Set([...prev, note]))
@@ -82,25 +103,6 @@ export function PianoKeyboard({ onNotePlay, className }: PianoKeyboardProps) {
     setActiveNotes(new Set())
   }, [])
 
-  const parseSequenceInput = useCallback((raw: string): NoteEvent[] | null => {
-    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean)
-    const events: NoteEvent[] = []
-    for (const part of parts) {
-      const [noteStr, durStr] = part.split(":").map((s) => s.trim())
-      if (!noteStr) { setParseError(`Invalid entry: "${part}"`); return null }
-      const duration = durStr ? parseFloat(durStr) : 0.4
-      if (isNaN(duration) || duration <= 0) { setParseError(`Bad duration in: "${part}"`); return null }
-      events.push({ note: noteStr, duration })
-    }
-    setParseError(null)
-    return events
-  }, [])
-
-  useEffect(() => {
-    const parsed = parseSequenceInput(sequenceInput)
-    if (parsed) setSequence(parsed)
-  }, [sequenceInput, parseSequenceInput])
-
   return (
     <div className={cn("flex flex-col gap-6", className)}>
       {/* Keyboard */}
@@ -111,19 +113,20 @@ export function PianoKeyboard({ onNotePlay, className }: PianoKeyboardProps) {
         {WHITE_KEYS.map(({ note, octave }, i) => {
           const id = `${note}${octave}`
           const isActive = activeNotes.has(id)
+          const isSelected = selectedNotes.includes(id)
           return (
             <button
               key={id}
               onPointerDown={() => playNote(id)}
               className={cn(
                 "absolute top-0 border border-border rounded-b-md transition-colors duration-75 z-0",
-                isActive ? "bg-primary" : "bg-white hover:bg-primary/20 active:bg-primary/40"
+                isActive ? "bg-primary" : isSelected ? "bg-primary/30 hover:bg-primary/40" : "bg-white hover:bg-primary/20 active:bg-primary/40"
               )}
               style={{ left: i * WHITE_KEY_W, width: WHITE_KEY_W - 2, height: WHITE_KEY_H }}
             >
               <span className={cn(
                 "absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-medium pointer-events-none",
-                isActive ? "text-primary-foreground" : "text-muted-foreground"
+                isActive || isSelected ? "text-primary" : "text-muted-foreground"
               )}>
                 {id}
               </span>
@@ -133,13 +136,14 @@ export function PianoKeyboard({ onNotePlay, className }: PianoKeyboardProps) {
 
         {BLACK_KEYS.map(({ note, whiteIndex }) => {
           const isActive = activeNotes.has(note)
+          const isSelected = selectedNotes.includes(note)
           return (
             <button
               key={note}
               onPointerDown={(e) => { e.stopPropagation(); playNote(note, 0.4) }}
               className={cn(
                 "absolute top-0 rounded-b-md z-10 transition-colors duration-75",
-                isActive ? "bg-primary" : "bg-zinc-900 hover:bg-zinc-700 active:bg-primary"
+                isActive ? "bg-primary" : isSelected ? "bg-primary/70 hover:bg-primary/80" : "bg-zinc-900 hover:bg-zinc-700 active:bg-primary"
               )}
               style={{
                 left: whiteIndex * WHITE_KEY_W + WHITE_KEY_W - BLACK_KEY_W / 2,
@@ -166,11 +170,11 @@ export function PianoKeyboard({ onNotePlay, className }: PianoKeyboardProps) {
           Example: <code className="bg-secondary px-1 rounded">C4:0.4, E4:0.4, G4:0.8</code>
         </p>
         <textarea
-          value={sequenceInput}
-          onChange={(e) => setSequenceInput(e.target.value)}
+          value={displayInput}
+          onChange={(e) => setManualInput(e.target.value)}
           rows={2}
           className="w-full rounded-lg border border-border bg-secondary p-2 text-sm font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
-          placeholder="C4:0.4, E4:0.4, G4:0.4, C5:0.8"
+          placeholder="Select notes above to populate, or type manually: C4:0.4, E4:0.4"
         />
         {parseError && <p className="text-xs text-destructive">{parseError}</p>}
         <div className="flex gap-2">
