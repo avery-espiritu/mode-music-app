@@ -58,22 +58,12 @@ export function FigmaCanvas({
             </div>
             <span className="font-semibold text-foreground">Modalation</span>
           </div>
-          <span className="text-muted-foreground text-sm">/ Prototype</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
-            Share
-          </Button>
-          <Button size="sm" className="bg-primary text-primary-foreground">
-            <Play className="w-3 h-3 mr-1" />
-            Present
-          </Button>
         </div>
       </header>
 
       <div className="flex-1 flex">
         {/* Left Sidebar - Screens */}
-        <aside className="w-64 border-r border-border bg-card/50 p-4 hidden lg:block">
+        {/* <aside className="w-64 border-r border-border bg-card/50 p-4 hidden lg:block">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Screens
           </h3>
@@ -94,7 +84,7 @@ export function FigmaCanvas({
               </button>
             ))}
           </div>
-        </aside>
+        </aside> */}
 
         {/* Main Canvas Area */}
         <main className="flex-1 bg-background p-4 md:p-8 overflow-auto">
