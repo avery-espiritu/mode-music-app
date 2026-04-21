@@ -1,13 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, Play, Music, MessageSquare, Keyboard, Sparkles, Volume2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { CompositionResult } from "@/lib/composition"
+import { EMOTIONAL_QUESTIONS } from "@/lib/emotional-questions"
+import { PianoKeyboard } from "@/components/piano-keyboard"
+import { playSequence } from "@/lib/audio"
 
 interface FigmaCanvasProps {
   currentScreen: number
   onNavigate: (screen: number) => void
+  story: string
+  onStoryChange: (value: string) => void
+  emotionalAnswers: string[]
+  onEmotionalAnswersChange: (answers: string[]) => void
+  selectedNotes: string[]
+  onSelectedNotesChange: (notes: string[]) => void
+  composition: CompositionResult | null
+  compositionError: string | null
+  onGenerateComposition: () => Promise<void>
+  onResetJourney: () => void
 }
 
 const screens = [
@@ -19,7 +33,20 @@ const screens = [
   { id: 5, name: "Playback", icon: Volume2 },
 ]
 
-export function FigmaCanvas({ currentScreen, onNavigate }: FigmaCanvasProps) {
+export function FigmaCanvas({
+  currentScreen,
+  onNavigate,
+  story,
+  onStoryChange,
+  emotionalAnswers,
+  onEmotionalAnswersChange,
+  selectedNotes,
+  onSelectedNotesChange,
+  composition,
+  compositionError,
+  onGenerateComposition,
+  onResetJourney,
+}: FigmaCanvasProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Figma-style Top Bar */}
@@ -29,7 +56,7 @@ export function FigmaCanvas({ currentScreen, onNavigate }: FigmaCanvasProps) {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Music className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-foreground">Modescape</span>
+            <span className="font-semibold text-foreground">Modalation</span>
           </div>
           <span className="text-muted-foreground text-sm">/ Prototype</span>
         </div>
@@ -74,7 +101,20 @@ export function FigmaCanvas({ currentScreen, onNavigate }: FigmaCanvasProps) {
           <div className="max-w-4xl mx-auto">
             {/* Screen Preview */}
             <div className="bg-card rounded-xl border border-border shadow-2xl overflow-hidden">
-              <ScreenContent screen={currentScreen} onNavigate={onNavigate} />
+              <ScreenContent
+                screen={currentScreen}
+                onNavigate={onNavigate}
+                story={story}
+                onStoryChange={onStoryChange}
+                emotionalAnswers={emotionalAnswers}
+                onEmotionalAnswersChange={onEmotionalAnswersChange}
+                selectedNotes={selectedNotes}
+                onSelectedNotesChange={onSelectedNotesChange}
+                composition={composition}
+                compositionError={compositionError}
+                onGenerateComposition={onGenerateComposition}
+                onResetJourney={onResetJourney}
+              />
             </div>
 
             {/* Navigation Controls */}
@@ -122,20 +162,71 @@ export function FigmaCanvas({ currentScreen, onNavigate }: FigmaCanvasProps) {
   )
 }
 
-function ScreenContent({ screen, onNavigate }: { screen: number; onNavigate: (s: number) => void }) {
+function ScreenContent({
+  screen,
+  onNavigate,
+  story,
+  onStoryChange,
+  emotionalAnswers,
+  onEmotionalAnswersChange,
+  selectedNotes,
+  onSelectedNotesChange,
+  composition,
+  compositionError,
+  onGenerateComposition,
+  onResetJourney,
+}: {
+  screen: number
+  onNavigate: (s: number) => void
+  story: string
+  onStoryChange: (value: string) => void
+  emotionalAnswers: string[]
+  onEmotionalAnswersChange: (answers: string[]) => void
+  selectedNotes: string[]
+  onSelectedNotesChange: (notes: string[]) => void
+  composition: CompositionResult | null
+  compositionError: string | null
+  onGenerateComposition: () => Promise<void>
+  onResetJourney: () => void
+}) {
   switch (screen) {
     case 0:
       return <WelcomeScreen onNavigate={onNavigate} />
     case 1:
-      return <StoryInputScreen onNavigate={onNavigate} />
+      return <StoryInputScreen story={story} onStoryChange={onStoryChange} onNavigate={onNavigate} />
     case 2:
-      return <AIQuestionsScreen onNavigate={onNavigate} />
+      return (
+        <AIQuestionsScreen
+          emotionalAnswers={emotionalAnswers}
+          onEmotionalAnswersChange={onEmotionalAnswersChange}
+          onNavigate={onNavigate}
+        />
+      )
     case 3:
-      return <KeyboardScreen onNavigate={onNavigate} />
+      return (
+        <KeyboardScreen
+          selectedNotes={selectedNotes}
+          onSelectedNotesChange={onSelectedNotesChange}
+          onNavigate={onNavigate}
+        />
+      )
     case 4:
-      return <GenerationScreen onNavigate={onNavigate} />
+      return (
+        <GenerationScreen
+          onNavigate={onNavigate}
+          compositionError={compositionError}
+          onGenerateComposition={onGenerateComposition}
+        />
+      )
     case 5:
-      return <PlaybackScreen onNavigate={onNavigate} />
+      return (
+        <PlaybackScreen
+          onNavigate={onNavigate}
+          story={story}
+          composition={composition}
+          onResetJourney={onResetJourney}
+        />
+      )
     default:
       return null
   }
@@ -158,7 +249,7 @@ function WelcomeScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
 
         <div className="space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight">
-            Modescape
+            Modalation
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
             Discover how musical modes shape the emotional landscape of your stories. 
@@ -200,9 +291,15 @@ function WelcomeScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
 }
 
 // Screen 2: Story Input
-function StoryInputScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
-  const [story, setStory] = useState("")
-
+function StoryInputScreen({
+  story,
+  onStoryChange,
+  onNavigate,
+}: {
+  story: string
+  onStoryChange: (value: string) => void
+  onNavigate: (s: number) => void
+}) {
   return (
     <div className="min-h-[600px] flex flex-col p-8 bg-card">
       {/* Header */}
@@ -225,7 +322,7 @@ function StoryInputScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
         <div className="flex-1 flex flex-col">
           <textarea
             value={story}
-            onChange={(e) => setStory(e.target.value)}
+            onChange={(e) => onStoryChange(e.target.value)}
             placeholder="Once upon a time, in a quiet village nestled between mountains..."
             className="flex-1 min-h-[200px] w-full p-4 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
@@ -243,12 +340,15 @@ function StoryInputScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
             {["A hero&apos;s journey", "A love story", "A mystery unfolds"].map((example) => (
               <button
                 key={example}
-                onClick={() => setStory(example === "A hero&apos;s journey" 
-                  ? "A young warrior leaves their peaceful village to face the darkness that threatens the land. Through trials and loss, they discover inner strength they never knew existed."
-                  : example === "A love story"
-                  ? "Two strangers meet on a rainy evening. What begins as a chance encounter blossoms into something neither expected, changing their lives forever."
-                  : "The old mansion held secrets. As Sarah explored the dusty rooms, she found a letter that would unravel everything she thought she knew."
-                )}
+                onClick={() =>
+                  onStoryChange(
+                    example === "A hero&apos;s journey"
+                      ? "A young warrior leaves their peaceful village to face the darkness that threatens the land. Through trials and loss, they discover inner strength they never knew existed."
+                      : example === "A love story"
+                        ? "Two strangers meet on a rainy evening. What begins as a chance encounter blossoms into something neither expected, changing their lives forever."
+                        : "The old mansion held secrets. As Sarah explored the dusty rooms, she found a letter that would unravel everything she thought she knew.",
+                  )
+                }
                 className="px-3 py-1.5 rounded-lg bg-secondary/50 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
               >
                 {example.replace("&apos;", "'")}
@@ -275,32 +375,22 @@ function StoryInputScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
 }
 
 // Screen 3: AI Questions
-function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<string[]>([])
-
-  const questions = [
-    {
-      question: "What emotion defines the beginning of your story?",
-      options: ["Peaceful & calm", "Mysterious & tense", "Joyful & bright", "Melancholic & wistful"]
-    },
-    {
-      question: "How does the emotional intensity change?",
-      options: ["Builds gradually", "Sudden dramatic shift", "Waves of emotion", "Steady throughout"]
-    },
-    {
-      question: "What feeling should the ending evoke?",
-      options: ["Triumphant resolution", "Bittersweet reflection", "Open & wondering", "Peaceful closure"]
-    }
-  ]
+function AIQuestionsScreen({
+  emotionalAnswers,
+  onEmotionalAnswersChange,
+  onNavigate,
+}: {
+  emotionalAnswers: string[]
+  onEmotionalAnswersChange: (answers: string[]) => void
+  onNavigate: (s: number) => void
+}) {
+  const questions = EMOTIONAL_QUESTIONS
+  const currentIndex = Math.min(emotionalAnswers.length, questions.length - 1)
+  const isComplete = emotionalAnswers.length >= questions.length
 
   const handleAnswer = (answer: string) => {
-    const newAnswers = [...answers, answer]
-    setAnswers(newAnswers)
-    
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1)
-    }
+    if (emotionalAnswers.length >= questions.length) return
+    onEmotionalAnswersChange([...emotionalAnswers, answer])
   }
 
   return (
@@ -321,11 +411,11 @@ function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) 
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Modescape AI</p>
+            <p className="text-sm text-muted-foreground">Modalation AI</p>
             <div className="bg-secondary rounded-xl rounded-tl-none p-4">
               <p className="text-foreground">
-                {currentQuestion < questions.length 
-                  ? questions[currentQuestion].question
+                {!isComplete
+                  ? questions[currentIndex].question
                   : "Perfect! I have a great sense of your story's emotional arc now."}
               </p>
             </div>
@@ -335,20 +425,22 @@ function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) 
         {/* Progress */}
         <div className="mb-6">
           <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-            <span>Question {Math.min(currentQuestion + 1, 3)} of 3</span>
+            <span>Question {Math.min(emotionalAnswers.length + 1, questions.length)} of {questions.length}</span>
           </div>
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
             <div 
               className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${((currentQuestion + (answers.length === 3 ? 1 : 0)) / 3) * 100}%` }}
+              style={{
+                width: `${(isComplete ? 100 : (emotionalAnswers.length / questions.length) * 100)}%`,
+              }}
             />
           </div>
         </div>
 
         {/* Options or Complete */}
-        {currentQuestion < questions.length && answers.length < 3 ? (
+        {!isComplete ? (
           <div className="space-y-3">
-            {questions[currentQuestion].options.map((option) => (
+            {questions[currentIndex].options.map((option) => (
               <button
                 key={option}
                 onClick={() => handleAnswer(option)}
@@ -363,7 +455,7 @@ function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) 
             <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
               <p className="text-primary font-medium">Emotional journey mapped!</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Your story moves through {answers.length} distinct emotional phases.
+                Your story moves through {emotionalAnswers.length} distinct emotional phases.
               </p>
             </div>
             <button
@@ -376,11 +468,11 @@ function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) 
         )}
 
         {/* Previous answers */}
-        {answers.length > 0 && currentQuestion < questions.length && (
+        {emotionalAnswers.length > 0 && !isComplete && (
           <div className="mt-8 space-y-2">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Your answers:</p>
             <div className="flex flex-wrap gap-2">
-              {answers.map((answer, i) => (
+              {emotionalAnswers.map((answer, i) => (
                 <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
                   {answer}
                 </span>
@@ -394,28 +486,27 @@ function AIQuestionsScreen({ onNavigate }: { onNavigate: (s: number) => void }) 
 }
 
 // Screen 4: Keyboard Selection
-function KeyboardScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
-  const [selectedNotes, setSelectedNotes] = useState<string[]>([])
-
-  const whiteKeys = ["C", "D", "E", "F", "G", "A", "B"]
-  const blackKeys = [
-    { note: "C#", position: 1 },
-    { note: "D#", position: 2 },
-    { note: "F#", position: 4 },
-    { note: "G#", position: 5 },
-    { note: "A#", position: 6 },
-  ]
-
-  const toggleNote = (note: string) => {
-    if (selectedNotes.includes(note)) {
-      setSelectedNotes(selectedNotes.filter((n) => n !== note))
+function KeyboardScreen({
+  selectedNotes,
+  onSelectedNotesChange,
+  onNavigate,
+}: {
+  selectedNotes: string[]
+  onSelectedNotesChange: (notes: string[]) => void
+  onNavigate: (s: number) => void
+}) {
+  const handleNotePlay = (note: string) => {
+    // Strip octave number to get bare note name for the story selection
+    const bare = note.replace(/\d/, "")
+    if (selectedNotes.includes(bare)) {
+      onSelectedNotesChange(selectedNotes.filter((n) => n !== bare))
     } else if (selectedNotes.length < 3) {
-      setSelectedNotes([...selectedNotes, note])
+      onSelectedNotesChange([...selectedNotes, bare])
     }
   }
 
   return (
-    <div className="min-h-[600px] flex flex-col p-8 bg-card">
+    <div className="min-h-[600px] flex flex-col p-8 bg-card overflow-x-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => onNavigate(2)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -425,16 +516,16 @@ function KeyboardScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
         <div className="w-5" />
       </div>
 
-      <div className="flex-1 flex flex-col max-w-xl mx-auto w-full">
-        <div className="space-y-2 mb-8">
-          <h2 className="text-2xl font-semibold text-foreground">Choose 3 notes</h2>
+      <div className="flex-1 flex flex-col w-full">
+        <div className="space-y-2 mb-6">
+          <h2 className="text-2xl font-semibold text-foreground">Play & Choose 3 notes</h2>
           <p className="text-muted-foreground">
-            Select notes that feel right for your story. Trust your instincts.
+            Click keys to hear them. The first 3 you play will be selected for your story.
           </p>
         </div>
 
         {/* Selected notes display */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6">
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -453,57 +544,8 @@ function KeyboardScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
           </p>
         </div>
 
-        {/* Piano Keyboard */}
-        <div className="relative flex justify-center mb-8">
-          <div className="relative flex">
-            {/* White keys */}
-            {whiteKeys.map((note, i) => (
-              <button
-                key={note}
-                onClick={() => toggleNote(note)}
-                className={cn(
-                  "w-12 h-36 border border-border rounded-b-lg transition-all relative z-0",
-                  selectedNotes.includes(note)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-foreground/95 text-background hover:bg-foreground/80"
-                )}
-              >
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm font-medium">
-                  {note}
-                </span>
-              </button>
-            ))}
-            {/* Black keys */}
-            {blackKeys.map(({ note, position }) => (
-              <button
-                key={note}
-                onClick={() => toggleNote(note)}
-                className={cn(
-                  "absolute w-8 h-24 rounded-b-lg transition-all z-10",
-                  selectedNotes.includes(note)
-                    ? "bg-primary"
-                    : "bg-background border border-border hover:bg-secondary"
-                )}
-                style={{ left: `${position * 48 - 16}px` }}
-              >
-                <span className={cn(
-                  "absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-medium",
-                  selectedNotes.includes(note) ? "text-primary-foreground" : "text-foreground"
-                )}>
-                  {note}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Hint */}
-        <div className="p-4 rounded-xl bg-secondary/50 border border-border mb-6">
-          <p className="text-sm text-muted-foreground">
-            <span className="text-foreground font-medium">Tip:</span> There&apos;s no wrong choice. 
-            Each note combination will create a unique modal character for your melody.
-          </p>
-        </div>
+        {/* Real 2-octave piano + sequence player */}
+        <PianoKeyboard onNotePlay={handleNotePlay} className="mb-6" />
 
         <button
           onClick={() => onNavigate(4)}
@@ -522,32 +564,58 @@ function KeyboardScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
   )
 }
 
+const GENERATION_STAGES = [
+  { name: "Analyzing emotional arc", threshold: 25 },
+  { name: "Selecting modal scales", threshold: 50 },
+  { name: "Composing melody", threshold: 75 },
+  { name: "Finalizing arrangement", threshold: 100 },
+] as const
+
 // Screen 5: Generation Loading
-function GenerationScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
+function GenerationScreen({
+  onNavigate,
+  compositionError,
+  onGenerateComposition,
+}: {
+  onNavigate: (s: number) => void
+  compositionError: string | null
+  onGenerateComposition: () => Promise<void>
+}) {
   const [progress, setProgress] = useState(0)
 
-  // Simulate generation progress
-  useState(() => {
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval)
-          return 100
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined
+    let cancelled = false
+
+    const tick = () => {
+      setProgress((p) => (p < 92 ? p + 2 : p))
+    }
+
+    const run = async () => {
+      setProgress(4)
+      interval = setInterval(tick, 120)
+      try {
+        await onGenerateComposition()
+        if (!cancelled) {
+          setProgress(100)
         }
-        return p + 2
-      })
-    }, 100)
-    return () => clearInterval(interval)
-  })
+      } catch {
+        if (!cancelled) setProgress(0)
+      } finally {
+        if (interval) clearInterval(interval)
+      }
+    }
 
-  const stages = [
-    { name: "Analyzing emotional arc", threshold: 25 },
-    { name: "Selecting modal scales", threshold: 50 },
-    { name: "Composing melody", threshold: 75 },
-    { name: "Finalizing arrangement", threshold: 100 },
-  ]
+    run()
 
-  const currentStage = stages.findIndex((s) => progress < s.threshold) || stages.length - 1
+    return () => {
+      cancelled = true
+      if (interval) clearInterval(interval)
+    }
+  }, [onGenerateComposition])
+
+  const stageIdx = GENERATION_STAGES.findIndex((s) => progress < s.threshold)
+  const stageLabel = GENERATION_STAGES[stageIdx === -1 ? GENERATION_STAGES.length - 1 : stageIdx].name
 
   return (
     <div className="min-h-[600px] flex flex-col items-center justify-center p-8 bg-card">
@@ -555,7 +623,7 @@ function GenerationScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
         {/* Animated icon */}
         <div className="relative w-24 h-24 mx-auto">
           <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-          <div 
+          <div
             className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
             style={{ animationDuration: "1.5s" }}
           />
@@ -567,14 +635,14 @@ function GenerationScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold text-foreground">Creating your melody</h2>
           <p className="text-muted-foreground">
-            {stages[currentStage >= 0 ? currentStage : 0].name}...
+            {compositionError ? "Something went wrong while consulting the AI." : `${stageLabel}...`}
           </p>
         </div>
 
         {/* Progress bar */}
         <div className="space-y-2">
           <div className="h-2 bg-secondary rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-primary rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
@@ -582,50 +650,158 @@ function GenerationScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
           <p className="text-sm text-muted-foreground">{progress}%</p>
         </div>
 
-        {/* Mode preview */}
-        <div className="grid grid-cols-3 gap-3 pt-4">
-          {["Ionian", "Dorian", "Aeolian"].map((mode, i) => (
-            <div 
-              key={mode}
-              className={cn(
-                "p-3 rounded-lg border transition-all",
-                progress > (i + 1) * 30
-                  ? "bg-primary/10 border-primary/30 text-primary"
-                  : "bg-secondary/50 border-border text-muted-foreground"
-              )}
-            >
-              <p className="text-sm font-medium">{mode}</p>
-              <p className="text-xs opacity-70">
-                {mode === "Ionian" ? "Happy" : mode === "Dorian" ? "Groovy" : "Sad"}
-              </p>
+        {compositionError ? (
+          <div className="space-y-3 text-left">
+            <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-sm text-foreground">
+              {compositionError}
             </div>
-          ))}
-        </div>
+            <Button
+              className="w-full"
+              onClick={async () => {
+                setProgress(4)
+                try {
+                  await onGenerateComposition()
+                  setProgress(100)
+                } catch {
+                  setProgress(0)
+                }
+              }}
+            >
+              Try again
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => onNavigate(3)}>
+              Back to notes
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Mode preview */}
+            <div className="grid grid-cols-3 gap-3 pt-4">
+              {["Ionian", "Dorian", "Aeolian"].map((mode, i) => (
+                <div
+                  key={mode}
+                  className={cn(
+                    "p-3 rounded-lg border transition-all",
+                    progress > (i + 1) * 30
+                      ? "bg-primary/10 border-primary/30 text-primary"
+                      : "bg-secondary/50 border-border text-muted-foreground",
+                  )}
+                >
+                  <p className="text-sm font-medium">{mode}</p>
+                  <p className="text-xs opacity-70">
+                    {mode === "Ionian" ? "Bright" : mode === "Dorian" ? "Soulful" : "Introspective"}
+                  </p>
+                </div>
+              ))}
+            </div>
 
-        {progress >= 100 && (
-          <button
-            onClick={() => onNavigate(5)}
-            className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-          >
-            Listen to Your Story
-          </button>
+            {progress >= 100 && (
+              <button
+                onClick={() => onNavigate(5)}
+                className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
+              >
+                Listen to Your Story
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
   )
 }
 
+const PLAYBACK_SECTION_COLORS = ["bg-chart-4", "bg-chart-2", "bg-chart-1", "bg-chart-3"] as const
+
+const FALLBACK_PLAYBACK_SECTIONS = [
+  { name: "Opening", mode: "Dorian", emotion: "Mysterious" },
+  { name: "Rising Action", mode: "Mixolydian", emotion: "Building tension" },
+  { name: "Climax", mode: "Ionian", emotion: "Triumphant" },
+  { name: "Resolution", mode: "Aeolian", emotion: "Reflective" },
+]
+
 // Screen 6: Playback
-function PlaybackScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
+function PlaybackScreen({
+  onNavigate,
+  story,
+  composition,
+  onResetJourney,
+}: {
+  onNavigate: (s: number) => void
+  story: string
+  composition: CompositionResult | null
+  onResetJourney: () => void
+}) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentSection, setCurrentSection] = useState(0)
+  const [activeNote, setActiveNote] = useState<string | null>(null)
+  const stopHandleRef = useRef<{ stop: () => void } | null>(null)
 
-  const sections = [
-    { name: "Opening", mode: "Dorian", emotion: "Mysterious", color: "bg-chart-4" },
-    { name: "Rising Action", mode: "Mixolydian", emotion: "Building tension", color: "bg-chart-2" },
-    { name: "Climax", mode: "Ionian", emotion: "Triumphant", color: "bg-chart-1" },
-    { name: "Resolution", mode: "Aeolian", emotion: "Reflective", color: "bg-chart-3" },
-  ]
+  const sections = (composition?.sections ?? FALLBACK_PLAYBACK_SECTIONS).map((section, i) => ({
+    ...section,
+    color: PLAYBACK_SECTION_COLORS[i % PLAYBACK_SECTION_COLORS.length],
+  }))
+
+  const modeLegend = composition
+    ? Array.from(new Set(composition.sections.map((s) => s.mode)))
+    : (["Ionian", "Dorian", "Aeolian", "Mixolydian"] as const)
+
+  const currentSectionData = sections[currentSection]
+  const hasNotes = "notes" in currentSectionData && Array.isArray(currentSectionData.notes) && currentSectionData.notes.length > 0
+
+  const handlePlay = useCallback(() => {
+    if (isPlaying || !hasNotes) return
+    const sec = currentSectionData as unknown as { notes: string[]; durations: number[] }
+    const events = sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4 }))
+    setIsPlaying(true)
+    stopHandleRef.current = playSequence(
+      events,
+      (note) => {
+        setActiveNote(note)
+        const dur = events.find((e) => e.note === note)?.duration ?? 0.4
+        setTimeout(() => setActiveNote(null), dur * 1000)
+      },
+      () => { setIsPlaying(false); setActiveNote(null) },
+    )
+  }, [isPlaying, hasNotes, currentSectionData])
+
+  const handleStop = useCallback(() => {
+    stopHandleRef.current?.stop()
+    stopHandleRef.current = null
+    setIsPlaying(false)
+    setActiveNote(null)
+  }, [])
+
+  const handlePlayAll = useCallback(() => {
+    if (isPlaying || !composition) return
+    const allEvents = composition.sections.flatMap((sec, si) =>
+      sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4, sectionIdx: si }))
+    )
+    setIsPlaying(true)
+    let sectionCursor = 0
+    let noteCount = 0
+    const sectionSizes = composition.sections.map((s) => s.notes.length)
+    stopHandleRef.current = playSequence(
+      allEvents,
+      (note) => {
+        setActiveNote(note)
+        const dur = allEvents[noteCount]?.duration ?? 0.4
+        noteCount++
+        // Update section indicator as we progress
+        let acc = 0
+        for (let i = 0; i < sectionSizes.length; i++) {
+          acc += sectionSizes[i]
+          if (noteCount <= acc) { setCurrentSection(i); sectionCursor = i; break }
+        }
+        setTimeout(() => setActiveNote(null), dur * 1000)
+      },
+      () => { setIsPlaying(false); setActiveNote(null) },
+    )
+  }, [isPlaying, composition])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { stopHandleRef.current?.stop() }
+  }, [])
 
   return (
     <div className="min-h-[600px] flex flex-col p-8 bg-card">
@@ -635,93 +811,149 @@ function PlaybackScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
           <ChevronLeft className="w-5 h-5" />
         </button>
         <span className="text-sm text-muted-foreground">Your Composition</span>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">
-          Share
-        </button>
+        <button className="text-muted-foreground hover:text-foreground transition-colors">Share</button>
       </div>
 
       <div className="flex-1 flex flex-col max-w-xl mx-auto w-full">
-        {/* Visualizer placeholder */}
-        <div className="h-40 rounded-xl bg-secondary/50 border border-border mb-6 flex items-center justify-center overflow-hidden relative">
-          <div className="absolute inset-0 flex items-end justify-around px-4 pb-4">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-2 rounded-full transition-all duration-150",
-                  isPlaying ? "bg-primary" : "bg-muted-foreground/30"
-                )}
-                style={{ 
-                  height: isPlaying ? `${20 + Math.random() * 60}%` : "20%",
-                  animationDelay: `${i * 50}ms`
-                }}
-              />
-            ))}
-          </div>
-          {!isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-              <p className="text-muted-foreground">Audio Visualizer</p>
+        {/* Active note display */}
+        <div className="h-24 rounded-xl bg-secondary/50 border border-border mb-6 flex items-center justify-center overflow-hidden relative">
+          {isPlaying ? (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-4xl font-bold text-primary transition-all duration-75">
+                {activeNote ?? "♩"}
+              </span>
+              <span className="text-xs text-muted-foreground">now playing</span>
             </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              {hasNotes ? "Press play to hear your melody" : "No melody data — generate a composition first"}
+            </p>
           )}
         </div>
 
-        {/* Story section indicator */}
+        {/* Section tabs */}
         <div className="mb-6">
           <div className="flex gap-1 mb-3">
             {sections.map((section, i) => (
               <button
                 key={section.name}
-                onClick={() => setCurrentSection(i)}
+                onClick={() => { if (!isPlaying) setCurrentSection(i) }}
                 className={cn(
                   "flex-1 h-2 rounded-full transition-all",
-                  i === currentSection ? section.color : "bg-muted"
+                  i === currentSection ? section.color : "bg-muted hover:bg-muted-foreground/30"
                 )}
               />
             ))}
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-foreground">{sections[currentSection].name}</p>
-              <p className="text-sm text-muted-foreground">{sections[currentSection].emotion}</p>
+              <p className="font-medium text-foreground">{currentSectionData.name}</p>
+              <p className="text-sm text-muted-foreground">{currentSectionData.emotion}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-primary">{sections[currentSection].mode} Mode</p>
+              <p className="text-sm font-medium text-primary">{currentSectionData.mode} Mode</p>
+              {hasNotes && (
+                <p className="text-xs text-muted-foreground">
+                  {(currentSectionData as unknown as { notes: string[] }).notes.length} notes
+                </p>
+              )}
             </div>
           </div>
         </div>
 
+        {/* Note sequence preview — unique notes sorted by pitch (scale view) */}
+        {hasNotes && (() => {
+          const NOTE_ORDER = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+          const rawNotes = (currentSectionData as unknown as { notes: string[] }).notes
+          const scaleNotes = [...new Set(rawNotes)].sort((a, b) => {
+            const octA = parseInt(a.slice(-1)), octB = parseInt(b.slice(-1))
+            if (octA !== octB) return octA - octB
+            return NOTE_ORDER.indexOf(a.slice(0, -1)) - NOTE_ORDER.indexOf(b.slice(0, -1))
+          })
+          return (
+            <div className="p-3 rounded-xl bg-secondary/50 border border-border mb-4 overflow-x-auto">
+              <p className="text-xs text-muted-foreground mb-2">Scale notes used</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {scaleNotes.map((note) => (
+                  <span
+                    key={note}
+                    className={cn(
+                      "px-2 py-0.5 rounded text-xs font-mono transition-colors",
+                      activeNote === note
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground"
+                    )}
+                  >
+                    {note}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
+        {composition && (
+          <div className="p-4 rounded-xl border border-primary/15 bg-primary/5 mb-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">AI melody direction</p>
+            <p className="text-sm text-foreground leading-relaxed">{composition.melodySummary}</p>
+            {composition.rationale && (
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{composition.rationale}</p>
+            )}
+          </div>
+        )}
+
         {/* Story text */}
-        <div className="p-4 rounded-xl bg-secondary/50 border border-border mb-6 min-h-[120px]">
-          <p className="text-foreground leading-relaxed">
-            &ldquo;A young warrior leaves their peaceful village to face the darkness that threatens the land. 
-            Through trials and loss, they discover inner strength they never knew existed.&rdquo;
+        <div className="p-4 rounded-xl bg-secondary/50 border border-border mb-6">
+          <p className="text-foreground leading-relaxed text-sm">
+            {story.trim().length > 0
+              ? <>&ldquo;{story.trim()}&rdquo;</>
+              : <span className="text-muted-foreground">Your story will appear here.</span>
+            }
           </p>
         </div>
 
         {/* Playback controls */}
-        <div className="flex items-center justify-center gap-6 mb-8">
-          <button 
-            onClick={() => setCurrentSection(Math.max(0, currentSection - 1))}
-            className="p-3 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors"
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <button
+            onClick={() => { if (!isPlaying) setCurrentSection(Math.max(0, currentSection - 1)) }}
+            disabled={isPlaying || currentSection === 0}
+            className="p-3 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
+
+          {/* Play current section */}
           <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="p-5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            onClick={isPlaying ? handleStop : handlePlay}
+            disabled={!hasNotes}
+            className="p-4 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40"
+            title="Play this section"
           >
             {isPlaying ? (
-              <div className="w-6 h-6 flex items-center justify-center gap-1">
-                <div className="w-1.5 h-5 bg-primary-foreground rounded" />
-                <div className="w-1.5 h-5 bg-primary-foreground rounded" />
+              <div className="w-5 h-5 flex items-center justify-center gap-1">
+                <div className="w-1.5 h-4 bg-foreground rounded" />
+                <div className="w-1.5 h-4 bg-foreground rounded" />
               </div>
             ) : (
-              <Play className="w-6 h-6 ml-0.5" />
+              <Play className="w-5 h-5 ml-0.5" />
             )}
           </button>
-          <button 
-            onClick={() => setCurrentSection(Math.min(sections.length - 1, currentSection + 1))}
-            className="p-3 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors"
+
+          {/* Play full composition */}
+          {composition && (
+            <button
+              onClick={isPlaying ? handleStop : handlePlayAll}
+              className="px-5 py-3 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
+              title="Play full composition"
+            >
+              {isPlaying ? "Stop" : "Play All"}
+            </button>
+          )}
+
+          <button
+            onClick={() => { if (!isPlaying) setCurrentSection(Math.min(sections.length - 1, currentSection + 1)) }}
+            disabled={isPlaying || currentSection === sections.length - 1}
+            className="p-3 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -731,20 +963,16 @@ function PlaybackScreen({ onNavigate }: { onNavigate: (s: number) => void }) {
         <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
           <p className="text-sm font-medium text-foreground mb-3">Modes in this composition:</p>
           <div className="flex flex-wrap gap-2">
-            {["Ionian (Happy)", "Dorian (Mysterious)", "Aeolian (Sad)", "Mixolydian (Groovy)"].map((mode) => (
-              <span 
-                key={mode} 
-                className="px-3 py-1 rounded-full bg-secondary text-sm text-foreground"
-              >
+            {modeLegend.map((mode) => (
+              <span key={mode} className="px-3 py-1 rounded-full bg-secondary text-sm text-foreground">
                 {mode}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Try again */}
         <button
-          onClick={() => onNavigate(0)}
+          onClick={onResetJourney}
           className="mt-6 w-full py-3 rounded-xl border border-border text-foreground font-medium hover:bg-secondary transition-colors"
         >
           Create Another Story

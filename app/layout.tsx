@@ -7,7 +7,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Modescape - Learn Musical Modes Through Story',
+  title: 'Modalation - Learn Musical Modes Through Story',
   description: 'An interactive experience teaching musical modes through emotional storytelling',
   generator: 'v0.app',
   icons: {

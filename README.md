@@ -1,70 +1,98 @@
-# mode-music-app
+# Modalation
 
-Final project for EDUC1485 — a [Next.js](https://nextjs.org/) app (App Router) with React 19, TypeScript, and Tailwind CSS v4.
+Final project for EDUC1485. An interactive music education app that generates original modal melodies from your story using AI. You write a short story, answer emotional questions, pick 3 anchor notes on a piano keyboard, and the app composes a 4-section melody — each section in a different musical mode that matches the emotional arc of your narrative.
+
+Built with Next.js 16, React 19, TypeScript, Tailwind CSS v4, Tone.js, and the Anthropic Claude API.
 
 ## Prerequisites
 
-- **Node.js** 20.9 or newer (required for Next.js 16)
-- **pnpm** — the repo is set up for pnpm via the `packageManager` field in `package.json`
+- **Node.js** 20.9 or newer ([nodejs.org](https://nodejs.org))
+- **pnpm** — the repo is pinned to pnpm via the `packageManager` field in `package.json`
+- **Anthropic API key** — the AI melody generation requires a key from [console.anthropic.com](https://console.anthropic.com)
 
-If you do not have pnpm yet, enable Corepack (ships with Node) and use the version pinned in the project:
+### Install pnpm (if you don't have it)
 
 ```bash
 corepack enable
 corepack prepare pnpm@10.33.0 --activate
 ```
 
-## Install
+## Setup
 
-From this directory (`mode-music-app`):
+**1. Clone and install dependencies**
 
 ```bash
+git clone <repo-url>
+cd mode-music-app
 pnpm install
 ```
 
-This installs everything listed in `package.json` and uses the lockfile (`pnpm-lock.yaml`) for reproducible installs.
+**2. Create your environment file**
 
-### Using npm or yarn instead
+```bash
+cp .env.example .env.local
+```
 
-You can install with another package manager, but the project is maintained with **pnpm**. If you switch, delete any other lockfile before committing, and follow that tool’s usual install command (for example `npm install`).
+Then open `.env.local` and add your Anthropic API key:
 
-## Run locally
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
 
-**Development** (hot reload, default [http://localhost:3000](http://localhost:3000)):
+> Your key stays local — `.env.local` is in `.gitignore` and is never committed.
+
+If you don't have a `.env.example`, create `.env.local` manually with the line above.
+
+**3. Start the dev server**
 
 ```bash
 pnpm dev
 ```
 
-**Production build** (compile and type-check):
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-```bash
-pnpm build
-```
+## How it works
 
-**Production server** (run after `pnpm build`):
+1. **Story Input** — Write a short story or scene (100–500 characters works well)
+2. **AI Questions** — Answer 3 emotional questions about your story's arc
+3. **Keyboard** — Click 3 notes on the interactive 2-octave piano to use as anchor notes
+4. **Generation** — Claude AI composes a 4-section melody, choosing a musical mode for each narrative phase (Opening → Development → Climax → Resolution)
+5. **Playback** — Listen to each section or play the full composition; see the scale notes used per section
 
-```bash
-pnpm start
-```
+## Musical modes
 
-**Lint** (ESLint flat config in `eslint.config.mjs`):
+The AI selects from all 7 church modes based on emotional context:
 
-```bash
-pnpm lint
-```
+| Mode | Character | Used for |
+|------|-----------|----------|
+| Ionian | Bright, major | Joy, triumph, celebration |
+| Dorian | Soulful, minor+maj6 | Hope within sadness, resilience |
+| Phrygian | Dark, minor+b2 | Danger, mystery, tension |
+| Lydian | Dreamy, major+#4 | Wonder, magic, the supernatural |
+| Mixolydian | Adventurous, major+b7 | Heroism, quests, bittersweet climax |
+| Aeolian | Melancholy, natural minor | Grief, loss, introspection |
+| Locrian | Unstable, diminished | Dread, chaos, peak tension |
 
 ## Scripts
 
-| Command       | Description              |
-| ------------- | ------------------------ |
-| `pnpm dev`    | Start dev server         |
-| `pnpm build`  | Production build         |
-| `pnpm start`  | Run production server    |
-| `pnpm lint`   | Run ESLint on the project |
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start dev server with hot reload |
+| `pnpm build` | Production build (type-checks too) |
+| `pnpm start` | Run production server (after build) |
+| `pnpm lint` | Run ESLint |
 
-## Project notes
+## Environment variables
 
-- Styling: Tailwind CSS v4 (`@tailwindcss/postcss`, `tailwindcss`).
-- UI: Radix-based components under `components/ui/` (shadcn-style setup).
-- No API keys are required for the default app; if you add secrets later, use `.env.local` (see `.gitignore`).
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes | Your Anthropic API key for melody generation |
+| `ANTHROPIC_MODEL` | No | Override the Claude model (default: `claude-opus-4-7`) |
+
+## Tech stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Tailwind CSS v4** + **shadcn/ui** component primitives (Radix UI)
+- **Tone.js** — web audio synthesis for piano playback with natural note decay
+- **Anthropic Claude API** — AI melody composition
+- **Zod** — schema validation for API requests and AI responses
