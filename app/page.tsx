@@ -54,6 +54,30 @@ export default function FigmaMockup() {
     setComposition(data as CompositionResult)
   }, [story, emotionalAnswers, selectedNotes])
 
+  const regenerateComposition = useCallback(async (newStory: string, preferredModes: string[]) => {
+    setCompositionError(null)
+    setStory(newStory)
+
+    const res = await fetch("/api/composition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ story: newStory, emotionalAnswers, selectedNotes, preferredModes }),
+    })
+
+    const data = (await res.json()) as { error?: string; detail?: string; details?: unknown }
+
+    if (!res.ok) {
+      const parts: string[] = []
+      if (typeof data.error === "string") parts.push(data.error)
+      if (typeof data.detail === "string") parts.push(data.detail)
+      const message = parts.join(" — ") || "Could not regenerate composition."
+      setCompositionError(message)
+      throw new Error(message)
+    }
+
+    setComposition(data as CompositionResult)
+  }, [emotionalAnswers, selectedNotes])
+
   const resetJourney = useCallback(() => {
     setStory("")
     setEmotionalAnswers([])
@@ -76,6 +100,7 @@ export default function FigmaMockup() {
       composition={composition}
       compositionError={compositionError}
       onGenerateComposition={generateComposition}
+      onRegenerate={regenerateComposition}
       onResetJourney={resetJourney}
     />
   )

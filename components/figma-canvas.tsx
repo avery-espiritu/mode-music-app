@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Play, Music, MessageSquare, Keyboard, Sparkles, Volume2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Play, Music, MessageSquare, Keyboard, Sparkles, Volume2, GripVertical, Pencil, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { CompositionResult } from "@/lib/composition"
+import { MODE_NAMES } from "@/lib/composition"
 import { EMOTIONAL_QUESTIONS } from "@/lib/emotional-questions"
 import { PianoKeyboard } from "@/components/piano-keyboard"
 import { playSequence } from "@/lib/audio"
@@ -21,6 +22,7 @@ interface FigmaCanvasProps {
   composition: CompositionResult | null
   compositionError: string | null
   onGenerateComposition: () => Promise<void>
+  onRegenerate: (story: string, modes: string[]) => Promise<void>
   onResetJourney: () => void
 }
 
@@ -45,6 +47,7 @@ export function FigmaCanvas({
   composition,
   compositionError,
   onGenerateComposition,
+  onRegenerate,
   onResetJourney,
 }: FigmaCanvasProps) {
   return (
@@ -64,6 +67,7 @@ export function FigmaCanvas({
             composition={composition}
             compositionError={compositionError}
             onGenerateComposition={onGenerateComposition}
+            onRegenerate={onRegenerate}
             onResetJourney={onResetJourney}
           />
         </div>
@@ -100,6 +104,7 @@ function ScreenContent({
   composition,
   compositionError,
   onGenerateComposition,
+  onRegenerate,
   onResetJourney,
 }: {
   screen: number
@@ -113,6 +118,7 @@ function ScreenContent({
   composition: CompositionResult | null
   compositionError: string | null
   onGenerateComposition: () => Promise<void>
+  onRegenerate: (story: string, modes: string[]) => Promise<void>
   onResetJourney: () => void
 }) {
   switch (screen) {
@@ -150,6 +156,7 @@ function ScreenContent({
           onNavigate={onNavigate}
           story={story}
           composition={composition}
+          onRegenerate={onRegenerate}
           onResetJourney={onResetJourney}
         />
       )
@@ -628,11 +635,13 @@ function PlaybackScreen({
   onNavigate,
   story,
   composition,
+  onRegenerate,
   onResetJourney,
 }: {
   onNavigate: (s: number) => void
   story: string
   composition: CompositionResult | null
+  onRegenerate: (story: string, modes: string[]) => Promise<void>
   onResetJourney: () => void
 }) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -640,6 +649,47 @@ function PlaybackScreen({
   const [activeNote, setActiveNote] = useState<string | null>(null)
   const stopHandleRef = useRef<{ stop: () => void } | null>(null)
 
+  // ── Edit & Explore state ─────────────────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedStory, setEditedStory] = useState(story)
+  const [editedSections, setEditedSections] = useState<{ name: string; mode: string }[]>([])
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dropIdx, setDropIdx] = useState<number | null>(null)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
+
+  const openEditor = () => {
+    const src = composition?.sections ?? FALLBACK_PLAYBACK_SECTIONS
+    setEditedSections(src.map(s => ({ name: s.name, mode: s.mode })))
+    setEditedStory(story)
+    setRegenerateError(null)
+    setIsEditing(true)
+  }
+
+  const reorderSections = (from: number, to: number) => {
+    const arr = [...editedSections]
+    const [item] = arr.splice(from, 1)
+    arr.splice(to, 0, item)
+    setEditedSections(arr)
+    setDragIdx(null)
+    setDropIdx(null)
+  }
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true)
+    setRegenerateError(null)
+    try {
+      await onRegenerate(editedStory, editedSections.map(s => s.mode))
+      setIsEditing(false)
+      setCurrentSection(0)
+    } catch (err) {
+      setRegenerateError(err instanceof Error ? err.message : "Regeneration failed.")
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
+  // ── Playback logic ───────────────────────────────────────────────────────
   const sections = (composition?.sections ?? FALLBACK_PLAYBACK_SECTIONS).map((section, i) => ({
     ...section,
     color: PLAYBACK_SECTION_COLORS[i % PLAYBACK_SECTION_COLORS.length],
@@ -681,7 +731,6 @@ function PlaybackScreen({
       sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4, sectionIdx: si }))
     )
     setIsPlaying(true)
-    let sectionCursor = 0
     let noteCount = 0
     const sectionSizes = composition.sections.map((s) => s.notes.length)
     stopHandleRef.current = playSequence(
@@ -690,11 +739,10 @@ function PlaybackScreen({
         setActiveNote(note)
         const dur = allEvents[noteCount]?.duration ?? 0.4
         noteCount++
-        // Update section indicator as we progress
         let acc = 0
         for (let i = 0; i < sectionSizes.length; i++) {
           acc += sectionSizes[i]
-          if (noteCount <= acc) { setCurrentSection(i); sectionCursor = i; break }
+          if (noteCount <= acc) { setCurrentSection(i); break }
         }
         setTimeout(() => setActiveNote(null), dur * 1000)
       },
@@ -702,7 +750,6 @@ function PlaybackScreen({
     )
   }, [isPlaying, composition])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { stopHandleRef.current?.stop() }
   }, [])
@@ -715,13 +762,109 @@ function PlaybackScreen({
           <ChevronLeft className="w-5 h-5" />
         </button>
         <span className="text-sm text-muted-foreground">Your Composition</span>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">Share</button>
+        <button
+          onClick={isEditing ? () => setIsEditing(false) : openEditor}
+          disabled={isPlaying}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+        >
+          {isEditing ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+          {isEditing ? "Close" : "Edit"}
+        </button>
       </div>
 
       <div className="flex-1 flex flex-col max-w-xl mx-auto w-full">
-        {/* Active note display */}
+
+        {/* ── Edit & Explore panel ─────────────────────────────────────── */}
+        {isEditing && (
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-5 space-y-5">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Your Story</p>
+              <textarea
+                value={editedStory}
+                onChange={e => setEditedStory(e.target.value)}
+                rows={4}
+                className="w-full p-3 rounded-xl bg-black/20 border border-white/10 text-foreground text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Section Modes</p>
+              <p className="text-xs text-muted-foreground mb-3">Drag to reorder · Change mode for each section</p>
+              <div className="space-y-2">
+                {editedSections.map((section, i) => (
+                  <div
+                    key={`${section.name}-${i}`}
+                    draggable
+                    onDragStart={() => setDragIdx(i)}
+                    onDragOver={e => { e.preventDefault(); setDropIdx(i) }}
+                    onDrop={() => dragIdx !== null && reorderSections(dragIdx, i)}
+                    onDragEnd={() => { setDragIdx(null); setDropIdx(null) }}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-grab active:cursor-grabbing select-none",
+                      dropIdx === i && dragIdx !== i
+                        ? "border-primary/60 bg-primary/10"
+                        : dragIdx === i
+                          ? "border-white/20 bg-white/10 opacity-60"
+                          : "border-white/10 bg-white/5 hover:bg-white/8"
+                    )}
+                  >
+                    <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground w-24 flex-shrink-0">{section.name}</span>
+                    <div className="flex-1 relative">
+                      <select
+                        value={section.mode}
+                        onChange={e => setEditedSections(prev =>
+                          prev.map((s, j) => j === i ? { ...s, mode: e.target.value } : s)
+                        )}
+                        className="w-full bg-black/30 text-foreground text-sm border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer"
+                      >
+                        {MODE_NAMES.map(m => (
+                          <option key={m} value={m} className="bg-zinc-900 text-white">{m}</option>
+                        ))}
+                      </select>
+                      <ChevronRight className="w-3 h-3 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {regenerateError && (
+              <p className="text-xs text-destructive">{regenerateError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsEditing(false)}
+                disabled={isRegenerating}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-foreground text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRegenerate}
+                disabled={isRegenerating || editedStory.trim().length < 10}
+                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isRegenerating ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-3 h-3 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+                    Generating…
+                  </span>
+                ) : "Regenerate Melody"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Active note display ──────────────────────────────────────── */}
         <div className="h-24 rounded-xl bg-white/5 border border-white/10 mb-6 flex items-center justify-center overflow-hidden relative">
-          {isPlaying ? (
+          {isRegenerating ? (
+            <div className="flex flex-col items-center gap-2">
+              <span className="w-6 h-6 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+              <span className="text-xs text-muted-foreground">Composing new melody…</span>
+            </div>
+          ) : isPlaying ? (
             <div className="flex flex-col items-center gap-1">
               <span className="text-4xl font-bold text-primary transition-all duration-75">
                 {activeNote ?? "♩"}
@@ -765,7 +908,7 @@ function PlaybackScreen({
           </div>
         </div>
 
-        {/* Note sequence preview — unique notes sorted by pitch (scale view) */}
+        {/* Note sequence preview */}
         {hasNotes && (() => {
           const NOTE_ORDER = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
           const rawNotes = (currentSectionData as unknown as { notes: string[] }).notes
@@ -826,10 +969,9 @@ function PlaybackScreen({
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          {/* Play current section */}
           <button
             onClick={isPlaying ? handleStop : handlePlay}
-            disabled={!hasNotes}
+            disabled={!hasNotes || isRegenerating}
             className="p-4 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40"
             title="Play this section"
           >
@@ -843,11 +985,11 @@ function PlaybackScreen({
             )}
           </button>
 
-          {/* Play full composition */}
           {composition && (
             <button
               onClick={isPlaying ? handleStop : handlePlayAll}
-              className="px-5 py-3 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
+              disabled={isRegenerating}
+              className="px-5 py-3 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
               title="Play full composition"
             >
               {isPlaying ? "Stop" : "Play All"}

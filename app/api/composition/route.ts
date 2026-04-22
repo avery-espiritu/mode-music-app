@@ -9,6 +9,7 @@ const requestSchema = z.object({
   story: z.string().min(1),
   emotionalAnswers: z.array(z.string()).length(EMOTIONAL_QUESTIONS.length),
   selectedNotes: z.array(z.string()).length(3),
+  preferredModes: z.array(z.string()).length(4).optional(),
 })
 
 // ── Story analysis ────────────────────────────────────────────────────────────
@@ -128,13 +129,21 @@ RULES:
 
 // ── User prompt ───────────────────────────────────────────────────────────────
 
-function buildPrompt(story: string, emotionalAnswers: string[], selectedNotes: string[]): string {
+function buildPrompt(
+  story: string,
+  emotionalAnswers: string[],
+  selectedNotes: string[],
+  preferredModes?: string[]
+): string {
   const answers = emotionalAnswers.join("; ")
   const storySnippet = story.slice(0, 300)
+  const modeConstraint = preferredModes
+    ? `\nRequired modes per section (follow exactly): Opening=${preferredModes[0]}, Development=${preferredModes[1]}, Climax=${preferredModes[2]}, Resolution=${preferredModes[3]}`
+    : ""
 
   return `Story: "${storySnippet}"
 Mood: ${answers}
-Anchor notes: ${selectedNotes.join(", ")}
+Anchor notes: ${selectedNotes.join(", ")}${modeConstraint}
 
 Return JSON: {"melodySummary":"<1-2 sentences>","rationale":"<1 sentence>","sections":[{"name":"Opening","mode":"<${MODE_NAMES.join("|")}>","emotion":"<word>","notes":["C4"],"durations":[0.4]},{"name":"Development",...},{"name":"Climax",...},{"name":"Resolution",...}]}`
 }
@@ -168,7 +177,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request.", details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { story, emotionalAnswers, selectedNotes } = parsed.data
+  const { story, emotionalAnswers, selectedNotes, preferredModes } = parsed.data
 
   // Step 1 — analyze story into narrative phases
   const phases = analyzeStory(story, emotionalAnswers)
@@ -188,7 +197,7 @@ export async function POST(req: Request) {
       model,
       max_tokens: 2048,
       system: buildSystemPrompt(ragContext),
-      messages: [{ role: "user", content: buildPrompt(story, emotionalAnswers, selectedNotes) }],
+      messages: [{ role: "user", content: buildPrompt(story, emotionalAnswers, selectedNotes, preferredModes) }],
     })
     const block = response.content.find((b) => b.type === "text")
     rawContent = block?.type === "text" ? block.text : ""
