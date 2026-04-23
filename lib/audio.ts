@@ -24,7 +24,7 @@ function getBassSynth(): Tone.PolySynth {
   if (!bassSynth) {
     bassSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: "sine" },
-      envelope: { attack: 0.08, decay: 0.3, sustain: 0.5, release: 1.8 },
+      envelope: { attack: 0.08, decay: 0.3, sustain: 0.5, release: 1.0 },
       volume: -14,
     }).toDestination()
   }
@@ -107,12 +107,10 @@ export function playWithBass(
     await Tone.start()
     const b = getBassSynth()
     b.releaseAll()
-    while (!cancelled) {
-      for (const { note, duration } of bassEvents) {
-        if (cancelled) break
-        b.triggerAttackRelease(note, duration * 0.7)
-        await new Promise<void>((res) => setTimeout(res, duration * 1000))
-      }
+    for (const { note, duration } of bassEvents) {
+      if (cancelled) break
+      b.triggerAttackRelease(note, duration * 0.7)
+      await new Promise<void>((res) => setTimeout(res, duration * 1000))
     }
   }
 
