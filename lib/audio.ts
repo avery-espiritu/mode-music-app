@@ -14,7 +14,7 @@ function getSynth(): Tone.PolySynth {
   if (!synth) {
     synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: "triangle" },
-      envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 1.2 },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.3 },
     }).toDestination()
   }
   return synth
@@ -24,25 +24,31 @@ function getBassSynth(): Tone.PolySynth {
   if (!bassSynth) {
     bassSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: "sawtooth" },
-      envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 2.0 },
+      envelope: { attack: 0.05, decay: 0.15, sustain: 0.6, release: 0.5 },
       volume: -8,
     }).toDestination()
   }
   return bassSynth
 }
 
-export async function startAudio() {
+export async function startAudio(): Promise<Tone.PolySynth> {
   await Tone.start()
   return getSynth()
 }
 
+/** Release all active voices on both synths immediately. */
+export function releaseAll(): void {
+  synth?.releaseAll()
+  bassSynth?.releaseAll()
+}
+
+/** Release a specific note on the melody synth (for piano key-up events). */
+export function releasePianoNote(note: string): void {
+  synth?.triggerRelease(note)
+}
+
 export type StopHandle = { stop: () => void }
 
-/**
- * Play a sequence of note events. Returns a handle with a `stop()` method.
- * `onNote` fires each time a note starts (with the note name).
- * `onDone` fires when the sequence ends naturally.
- */
 export function playSequence(
   events: NoteEvent[],
   onNote?: (note: string) => void,
@@ -52,6 +58,8 @@ export function playSequence(
 
   async function run() {
     const s = await startAudio()
+    // Clear any lingering piano notes before the sequence begins
+    s.releaseAll()
     for (const { note, duration } of events) {
       if (cancelled) break
       s.triggerAttackRelease(note, duration)
@@ -66,7 +74,7 @@ export function playSequence(
   return {
     stop() {
       cancelled = true
-      synth?.triggerRelease()
+      synth?.releaseAll()
     },
   }
 }
@@ -74,7 +82,6 @@ export function playSequence(
 /**
  * Play melody and bass sequences simultaneously.
  * Bass runs as an independent loop that repeats for the duration of the melody.
- * `onNote` fires for melody notes only. `onDone` fires when the melody ends.
  */
 export function playWithBass(
   melodyEvents: NoteEvent[],
@@ -86,6 +93,7 @@ export function playWithBass(
 
   async function runMelody() {
     const s = await startAudio()
+    s.releaseAll()
     for (const { note, duration } of melodyEvents) {
       if (cancelled) break
       s.triggerAttackRelease(note, duration)
@@ -98,11 +106,11 @@ export function playWithBass(
   async function runBass() {
     await Tone.start()
     const b = getBassSynth()
-    // Loop the bass pattern for the duration of the melody
+    b.releaseAll()
     while (!cancelled) {
       for (const { note, duration } of bassEvents) {
         if (cancelled) break
-        b.triggerAttackRelease(note, duration * 0.8) // slightly shorter for a punchy feel
+        b.triggerAttackRelease(note, duration * 0.7)
         await new Promise<void>((res) => setTimeout(res, duration * 1000))
       }
     }
@@ -114,8 +122,8 @@ export function playWithBass(
   return {
     stop() {
       cancelled = true
-      synth?.triggerRelease()
-      bassSynth?.triggerRelease()
+      synth?.releaseAll()
+      bassSynth?.releaseAll()
     },
   }
 }

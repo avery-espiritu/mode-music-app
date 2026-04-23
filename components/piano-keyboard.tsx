@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Play, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { playSequence as audioPlaySequence, startAudio, type NoteEvent } from "@/lib/audio"
+import { playSequence as audioPlaySequence, startAudio, releaseAll, releasePianoNote, type NoteEvent } from "@/lib/audio"
 
 export type { NoteEvent }
 
@@ -79,19 +79,27 @@ export function PianoKeyboard({ onNotePlay, selectedNotes = [], className }: Pia
     }, durationMs)
   }, [])
 
-  const playNote = useCallback(async (noteStr: string, durationSec = 0.5) => {
-    const synth = await startAudio()
-    synth.triggerAttackRelease(noteStr, durationSec)
-    flashNote(noteStr, durationSec * 1000)
+  // Attack on pointer down — note sustains as long as the key is held
+  const attackNote = useCallback(async (noteStr: string) => {
+    const s = await startAudio()
+    s.triggerAttack(noteStr)
+    setActiveNotes((prev) => new Set([...prev, noteStr]))
     onNotePlay?.(noteStr)
-  }, [flashNote, onNotePlay])
+  }, [onNotePlay])
+
+  // Release on pointer up / leave / cancel
+  const releaseNote = useCallback((noteStr: string) => {
+    releasePianoNote(noteStr)
+    setActiveNotes((prev) => { const n = new Set(prev); n.delete(noteStr); return n })
+  }, [])
 
   const handlePlaySequence = useCallback(() => {
     if (isPlaying) return
+    releaseAll() // clear any held piano keys before sequencer starts
     setIsPlaying(true)
     stopHandleRef.current = audioPlaySequence(
       sequence,
-      (note) => flashNote(note, sequence.find((e) => e.note === note)?.duration ?? 0.4 * 1000),
+      (note) => flashNote(note, (sequence.find((e) => e.note === note)?.duration ?? 0.4) * 1000),
       () => setIsPlaying(false),
     )
   }, [isPlaying, sequence, flashNote])
@@ -117,7 +125,10 @@ export function PianoKeyboard({ onNotePlay, selectedNotes = [], className }: Pia
           return (
             <button
               key={id}
-              onPointerDown={() => playNote(id)}
+              onPointerDown={() => attackNote(id)}
+              onPointerUp={() => releaseNote(id)}
+              onPointerLeave={() => releaseNote(id)}
+              onPointerCancel={() => releaseNote(id)}
               className={cn(
                 "absolute top-0 border border-border rounded-b-md transition-colors duration-75 z-0",
                 isActive ? "bg-primary" : isSelected ? "bg-primary/30 hover:bg-primary/40" : "bg-white hover:bg-primary/20 active:bg-primary/40"
@@ -140,7 +151,10 @@ export function PianoKeyboard({ onNotePlay, selectedNotes = [], className }: Pia
           return (
             <button
               key={note}
-              onPointerDown={(e) => { e.stopPropagation(); playNote(note, 0.4) }}
+              onPointerDown={(e) => { e.stopPropagation(); attackNote(note) }}
+              onPointerUp={() => releaseNote(note)}
+              onPointerLeave={() => releaseNote(note)}
+              onPointerCancel={() => releaseNote(note)}
               className={cn(
                 "absolute top-0 rounded-b-md z-10 transition-colors duration-75",
                 isActive ? "bg-primary" : isSelected ? "bg-primary/70 hover:bg-primary/80" : "bg-zinc-900 hover:bg-zinc-700 active:bg-primary"
