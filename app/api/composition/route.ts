@@ -149,7 +149,7 @@ MELODY RULES:
 - Each note pitch must be unique within a section — no repeated notes (e.g. C5 must appear at most once)
 
 BASS RULES:
-- bassNotes: 3-5 notes per section, octaves 1-2 only (e.g. C1, G1, A1, D2)
+- bassNotes: 3-5 notes per section, octaves 3-4 only (e.g. C3, G3, A3, D4)
 - bassDurations: longer values — prefer 0.8/1.6/3.2 for a supportive feel
 - Bass notes should be the root, fifth, or other strong scale tones of the section's mode
 - The bass pattern loops underneath the melody — keep it simple and rhythmically grounding`
