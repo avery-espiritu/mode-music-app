@@ -23,9 +23,9 @@ function getSynth(): Tone.PolySynth {
 function getBassSynth(): Tone.PolySynth {
   if (!bassSynth) {
     bassSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sawtooth" },
-      envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.8 },
-      volume: -8,
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.08, decay: 0.3, sustain: 0.5, release: 1.8 },
+      volume: -14,
     }).toDestination()
   }
   return bassSynth
