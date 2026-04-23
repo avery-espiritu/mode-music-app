@@ -98,7 +98,7 @@ function analyzeStory(story: string, emotionalAnswers: string[]): AnalyzedPhase[
 
 const COMPOSITION_TOOL: Anthropic.Tool = {
   name: "return_composition",
-  description: "Return the completed 4-section modal composition.",
+  description: "Return the completed 4-section modal composition including bass support.",
   input_schema: {
     type: "object",
     required: ["melodySummary", "sections"],
@@ -111,13 +111,15 @@ const COMPOSITION_TOOL: Anthropic.Tool = {
         maxItems: 4,
         items: {
           type: "object",
-          required: ["name", "mode", "emotion", "notes", "durations"],
+          required: ["name", "mode", "emotion", "notes", "durations", "bassNotes", "bassDurations"],
           properties: {
-            name:      { type: "string" },
-            mode:      { type: "string", enum: [...MODE_NAMES] },
-            emotion:   { type: "string" },
-            notes:     { type: "array", minItems: 4, items: { type: "string" } },
-            durations: { type: "array", minItems: 4, items: { type: "number", exclusiveMinimum: 0 } },
+            name:          { type: "string" },
+            mode:          { type: "string", enum: [...MODE_NAMES] },
+            emotion:       { type: "string" },
+            notes:         { type: "array", minItems: 4, items: { type: "string" } },
+            durations:     { type: "array", minItems: 4, items: { type: "number", exclusiveMinimum: 0 } },
+            bassNotes:     { type: "array", minItems: 2, items: { type: "string" } },
+            bassDurations: { type: "array", minItems: 2, items: { type: "number", exclusiveMinimum: 0 } },
           },
         },
       },
@@ -140,11 +142,17 @@ WHEN TO USE EACH MODE:
 - Aeolian (natural minor): grief, loss, introspection, melancholy — use for sorrow, endings, and reflection
 - Locrian (diminished): dread, chaos, instability, the uncanny — use sparingly for peak tension or collapse
 
-RULES:
+MELODY RULES:
 - Notes: scientific pitch, octaves 3-5, sharps only (C#/D#/F#/G#/A#)
 - 6-8 notes per section, durations in seconds: 0.2/0.4/0.8/1.6
 - Anchor notes must appear prominently; vary rhythm; mix steps and leaps
-- Each note pitch must be unique within a section — no repeated notes (e.g. C5 must appear at most once)`
+- Each note pitch must be unique within a section — no repeated notes (e.g. C5 must appear at most once)
+
+BASS RULES:
+- bassNotes: 3-5 notes per section, octaves 1-2 only (e.g. C1, G1, A1, D2)
+- bassDurations: longer values — prefer 0.8/1.6/3.2 for a supportive feel
+- Bass notes should be the root, fifth, or other strong scale tones of the section's mode
+- The bass pattern loops underneath the melody — keep it simple and rhythmically grounding`
 
 type SystemBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
 

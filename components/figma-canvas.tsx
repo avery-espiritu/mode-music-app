@@ -8,7 +8,7 @@ import type { CompositionResult } from "@/lib/composition"
 import { MODE_NAMES } from "@/lib/composition"
 import { EMOTIONAL_QUESTIONS } from "@/lib/emotional-questions"
 import { PianoKeyboard } from "@/components/piano-keyboard"
-import { playSequence } from "@/lib/audio"
+import { playSequence, playWithBass } from "@/lib/audio"
 
 interface FigmaCanvasProps {
   currentScreen: number
@@ -704,14 +704,16 @@ function PlaybackScreen({
 
   const handlePlay = useCallback(() => {
     if (isPlaying || !hasNotes) return
-    const sec = currentSectionData as unknown as { notes: string[]; durations: number[] }
-    const events = sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4 }))
+    const sec = currentSectionData as unknown as { notes: string[]; durations: number[]; bassNotes?: string[]; bassDurations?: number[] }
+    const melodyEvents = sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4 }))
+    const bassEvents = (sec.bassNotes ?? []).map((note, i) => ({ note, duration: sec.bassDurations?.[i] ?? 1.6 }))
     setIsPlaying(true)
-    stopHandleRef.current = playSequence(
-      events,
+    stopHandleRef.current = playWithBass(
+      melodyEvents,
+      bassEvents,
       (note) => {
         setActiveNote(note)
-        const dur = events.find((e) => e.note === note)?.duration ?? 0.4
+        const dur = melodyEvents.find((e) => e.note === note)?.duration ?? 0.4
         setTimeout(() => setActiveNote(null), dur * 1000)
       },
       () => { setIsPlaying(false); setActiveNote(null) },
@@ -727,17 +729,21 @@ function PlaybackScreen({
 
   const handlePlayAll = useCallback(() => {
     if (isPlaying || !composition) return
-    const allEvents = composition.sections.flatMap((sec, si) =>
+    const allMelody = composition.sections.flatMap((sec, si) =>
       sec.notes.map((note, i) => ({ note, duration: sec.durations[i] ?? 0.4, sectionIdx: si }))
+    )
+    const allBass = composition.sections.flatMap((sec) =>
+      sec.bassNotes.map((note, i) => ({ note, duration: sec.bassDurations[i] ?? 1.6 }))
     )
     setIsPlaying(true)
     let noteCount = 0
     const sectionSizes = composition.sections.map((s) => s.notes.length)
-    stopHandleRef.current = playSequence(
-      allEvents,
+    stopHandleRef.current = playWithBass(
+      allMelody,
+      allBass,
       (note) => {
         setActiveNote(note)
-        const dur = allEvents[noteCount]?.duration ?? 0.4
+        const dur = allMelody[noteCount]?.duration ?? 0.4
         noteCount++
         let acc = 0
         for (let i = 0; i < sectionSizes.length; i++) {
@@ -911,30 +917,45 @@ function PlaybackScreen({
         {/* Note sequence preview */}
         {hasNotes && (() => {
           const NOTE_ORDER = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-          const rawNotes = (currentSectionData as unknown as { notes: string[] }).notes
-          const scaleNotes = [...new Set(rawNotes)].sort((a, b) => {
+          const sec = currentSectionData as unknown as { notes: string[]; bassNotes?: string[] }
+          const scaleNotes = [...new Set(sec.notes)].sort((a, b) => {
             const octA = parseInt(a.slice(-1)), octB = parseInt(b.slice(-1))
             if (octA !== octB) return octA - octB
             return NOTE_ORDER.indexOf(a.slice(0, -1)) - NOTE_ORDER.indexOf(b.slice(0, -1))
           })
+          const bassNotes = sec.bassNotes ?? []
           return (
-            <div className="p-3 rounded-xl bg-white/5 border border-white/10 mb-4 overflow-x-auto">
-              <p className="text-xs text-muted-foreground mb-2">Scale notes used</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {scaleNotes.map((note) => (
-                  <span
-                    key={note}
-                    className={cn(
-                      "px-2 py-0.5 rounded text-xs font-mono transition-colors",
-                      activeNote === note
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground"
-                    )}
-                  >
-                    {note}
-                  </span>
-                ))}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 mb-4 overflow-x-auto space-y-2">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Melody</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {scaleNotes.map((note) => (
+                    <span
+                      key={note}
+                      className={cn(
+                        "px-2 py-0.5 rounded text-xs font-mono transition-colors",
+                        activeNote === note
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground"
+                      )}
+                    >
+                      {note}
+                    </span>
+                  ))}
+                </div>
               </div>
+              {bassNotes.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Bass</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[...new Set(bassNotes)].map((note) => (
+                      <span key={note} className="px-2 py-0.5 rounded text-xs font-mono bg-secondary/60 text-muted-foreground/70">
+                        {note}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}

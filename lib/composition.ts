@@ -18,6 +18,8 @@ export const compositionSectionSchema = z.object({
   emotion: z.string().min(1),
   notes: z.array(z.string()).min(4),
   durations: z.array(z.number().positive()).min(4),
+  bassNotes: z.array(z.string()).min(2),
+  bassDurations: z.array(z.number().positive()).min(2),
 })
 
 export const compositionResultSchema = z.object({
